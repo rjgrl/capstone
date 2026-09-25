@@ -1,0 +1,253 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Department {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  code      String            @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  programs  Program[]
+  faculty   Faculty[]
+  users     User[]
+  projects  ResearchProject[]
+}
+
+model Program {
+  id           String            @id @default(cuid())
+  name         String
+  departmentId String
+  department   Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  faculty      Faculty[]
+  projects     ResearchProject[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([departmentId, name])
+  @@index([departmentId])
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  key             String           @unique
+  name            String
+  description     String
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  key             String           @unique
+  name            String
+  description     String
+  module          String
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  passwordHash    String
+  name            String
+  roleId          String
+  role            Role             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  departmentId    String?
+  department      Department?      @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  faculty         Faculty?
+  userPermissions UserPermission[]
+  submissions     ProjectDocument[]
+  reviews         ReviewAction[]
+  notices         EmailNotice[]
+
+  @@index([roleId])
+  @@index([departmentId])
+}
+
+model UserPermission {
+  userId       String
+  permissionId String
+  granted      Boolean
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+}
+
+model Faculty {
+  id                 String            @id @default(cuid())
+  userId             String?           @unique
+  user               User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  firstName          String
+  middleName         String?
+  lastName           String
+  rank               String
+  departmentId       String
+  department         Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  programId          String?
+  program            Program?          @relation(fields: [programId], references: [id], onDelete: SetNull)
+  contactInformation String?
+  mobileNumber       String
+  institutionalEmail String            @unique
+  facebookAccount    String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  projects           ResearchProject[]
+
+  @@index([departmentId])
+  @@index([programId])
+  @@index([lastName, firstName])
+}
+
+model Checklist {
+  id          String            @id @default(cuid())
+  type        String            @unique
+  name        String
+  description String
+  phases      Phase[]
+  projects    ResearchProject[]
+}
+
+model Phase {
+  id          String            @id @default(cuid())
+  checklistId String
+  checklist   Checklist         @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  sequence    Int
+  items       ChecklistItem[]
+  projects    ResearchProject[] @relation("CurrentPhase")
+  documents   ProjectDocument[]
+
+  @@unique([checklistId, sequence])
+  @@index([checklistId])
+}
+
+model ChecklistItem {
+  id          String            @id @default(cuid())
+  phaseId     String
+  phase       Phase             @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  section      String?
+  isRequired   Boolean           @default(true)
+  requiresFile Boolean           @default(true)
+  sequence     Int
+  documents   ProjectDocument[]
+
+  @@unique([phaseId, sequence])
+  @@index([phaseId])
+}
+
+model ResearchProject {
+  id             String            @id @default(cuid())
+  title          String
+  summary        String?
+  facultyId      String
+  faculty        Faculty           @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  departmentId   String
+  department     Department        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  programId      String?
+  program        Program?          @relation(fields: [programId], references: [id], onDelete: SetNull)
+  checklistId    String
+  checklist      Checklist         @relation(fields: [checklistId], references: [id], onDelete: Restrict)
+  status         String
+  currentPhaseId String?
+  currentPhase   Phase?            @relation("CurrentPhase", fields: [currentPhaseId], references: [id], onDelete: SetNull)
+  year           Int
+  finishedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  documents      ProjectDocument[]
+  reviews        ReviewAction[]
+  notices        EmailNotice[]
+
+  @@index([facultyId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([year])
+  @@index([checklistId])
+}
+
+model ProjectDocument {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseId       String
+  phase         Phase          @relation(fields: [phaseId], references: [id], onDelete: Restrict)
+  checklistItemId String
+  checklistItem ChecklistItem  @relation(fields: [checklistItemId], references: [id], onDelete: Restrict)
+  version       Int
+  originalName  String
+  storedPath    String
+  fileSize      Int
+  submittedById String
+  submittedBy   User           @relation(fields: [submittedById], references: [id], onDelete: Restrict)
+  signatureData String
+  status        String
+  submittedAt   DateTime       @default(now())
+  reviews       ReviewAction[]
+
+  @@unique([projectId, checklistItemId, version])
+  @@index([projectId])
+  @@index([phaseId])
+  @@index([checklistItemId])
+  @@index([status])
+}
+
+model ReviewAction {
+  id                   String          @id @default(cuid())
+  documentId           String
+  document             ProjectDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  projectId            String
+  project              ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewerId           String
+  reviewer             User            @relation(fields: [reviewerId], references: [id], onDelete: Restrict)
+  action               String
+  remarks              String?
+  signatureData        String
+  revisedOriginalName  String?
+  revisedStoredPath    String?
+  createdAt            DateTime        @default(now())
+
+  @@index([documentId])
+  @@index([projectId])
+  @@index([reviewerId])
+}
+
+model EmailNotice {
+  id              String           @id @default(cuid())
+  recipientUserId String
+  recipient       User             @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  recipientEmail  String
+  projectId       String?
+  project         ResearchProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  subject         String
+  body            String
+  status          String
+  createdAt       DateTime         @default(now())
+
+  @@index([recipientUserId])
+  @@index([projectId])
+}
