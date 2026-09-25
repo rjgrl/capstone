@@ -78,6 +78,14 @@ async function seedChecklist(type: "STANDARD" | "PERSONALLY_FUNDED", checklist: 
 }
 
 async function main() {
+  if (process.env.SEED_IF_EMPTY === "1") {
+    const existing = await prisma.user.count();
+    if (existing > 0) {
+      console.log("Users already exist. Skipping seed.");
+      return;
+    }
+  }
+
   await clear();
   const passwordHash = await bcrypt.hash(PASSWORD, 12);
 

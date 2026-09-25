@@ -16,4 +16,14 @@ const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
   shell: true,
 });
 
-process.exit(result.status ?? 1);
+if (result.status !== 0) {
+  process.exit(result.status ?? 1);
+}
+
+const seed = spawnSync("npx", ["tsx", "prisma/seed.ts"], {
+  stdio: "inherit",
+  env: { ...process.env, SEED_IF_EMPTY: "1" },
+  shell: true,
+});
+
+process.exit(seed.status ?? 1);
