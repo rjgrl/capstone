@@ -1,16 +1,12 @@
 import { spawnSync } from "node:child_process";
+import { applyDatabaseEnv } from "./database-env.mjs";
 
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL || "";
-}
+applyDatabaseEnv();
 
-if (!process.env.DIRECT_URL) {
-  process.env.DIRECT_URL =
-    process.env.DATABASE_URL_UNPOOLED || process.env.POSTGRES_URL_NON_POOLING || process.env.DATABASE_URL;
-}
-
-if (!process.env.DATABASE_URL) {
-  console.error("Set DATABASE_URL to a PostgreSQL connection string before building.");
+if (!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("placeholder:placeholder@")) {
+  console.error(
+    "The build could not find a Postgres connection string. In the Vercel capstone project, connect the Neon database, or set DATABASE_URL to the pooled Neon URL and DIRECT_URL to the direct Neon URL. Then redeploy.",
+  );
   process.exit(1);
 }
 
